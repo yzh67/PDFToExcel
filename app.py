@@ -507,7 +507,7 @@ with center:
                         st.session_state.output_name = None
                         st.error("No TAX INVOICE data found in the uploaded PDF.")
                     else:
-                        st.session_state.output_name = Path(uploaded_file.name).with_suffix(".csv").name
+                        st.session_state.output_name = "PAR-HBWeeklyInvoiceData(RPM).csv"
                         st.session_state.csv_bytes = build_csv_bytes(invoices_data)
                         st.success(f"Conversion complete. Found {len(invoices_data)} TAX INVOICE page(s).")
 
