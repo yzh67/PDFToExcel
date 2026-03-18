@@ -178,13 +178,6 @@ def clean_text(value):
     return str(value).strip()
 
 
-def force_csv_text(value):
-    value = clean_text(value)
-    if value == "":
-        return ""
-    return f'="{value}"'
-
-
 def parse_amount(text):
     text = clean_text(text).replace(",", "")
     return float(text)
@@ -357,11 +350,11 @@ def build_csv_bytes(invoices_data):
     for invoice in invoices_data:
         for service_date, amount in invoice["lines"]:
             writer.writerow([
-                invoice["inv"],
-                force_csv_text(invoice["dept"]),
-                force_csv_text(invoice["ta"]),
-                invoice["guest"],
-                force_csv_text(service_date),
+                clean_text(invoice["inv"]),
+                clean_text(invoice["dept"]),
+                clean_text(invoice["ta"]),
+                clean_text(invoice["guest"]),
+                clean_text(service_date),
                 f"{amount:.2f}"
             ])
 
