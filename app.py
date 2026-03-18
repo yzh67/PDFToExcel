@@ -1,10 +1,12 @@
 import io
 import re
 import csv
+import base64
 from pathlib import Path
 
 import pdfplumber
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="PDF Converter",
@@ -145,8 +147,7 @@ st.markdown("""
         color: #64748b !important;
     }
 
-    .stButton > button,
-    .stDownloadButton > button {
+    .stButton > button {
         background: #4f46e5 !important;
         color: white !important;
         border: none !important;
@@ -157,8 +158,7 @@ st.markdown("""
         width: 100%;
     }
 
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
+    .stButton > button:hover {
         background: #4338ca !important;
     }
 
@@ -368,6 +368,93 @@ def build_csv_bytes(invoices_data):
     return output.getvalue().encode("utf-8-sig")
 
 
+def render_save_picker(csv_bytes, output_name):
+    b64_data = base64.b64encode(csv_bytes).decode("ascii")
+    safe_name = output_name.replace("\\", "\\\\").replace("'", "\\'")
+
+    html = f"""
+    <div style="margin-top: 12px;">
+      <button id="saveBtn" style="
+        width: 100%;
+        background: #107c10;
+        color: white;
+        border: none;
+        border-radius: 16px;
+        font-weight: 700;
+        padding: 0.92rem 1.2rem;
+        box-shadow: 0 14px 28px rgba(16, 124, 16, 0.20);
+        cursor: pointer;
+        font-size: 1rem;
+      ">Choose Save Location & Save CSV</button>
+      <div id="saveStatus" style="
+        margin-top: 10px;
+        color: #64748b;
+        font-family: sans-serif;
+        font-size: 0.92rem;
+      "></div>
+    </div>
+
+    <script>
+      const base64Data = '{b64_data}';
+      const outputName = '{safe_name}';
+
+      function base64ToUint8Array(base64) {{
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {{
+          bytes[i] = binaryString.charCodeAt(i);
+        }}
+        return bytes;
+      }}
+
+      async function saveCsv() {{
+        const status = document.getElementById("saveStatus");
+        const bytes = base64ToUint8Array(base64Data);
+        const blob = new Blob([bytes], {{ type: "text/csv;charset=utf-8" }});
+
+        try {{
+          if ("showSaveFilePicker" in window) {{
+            const handle = await window.showSaveFilePicker({{
+              suggestedName: outputName,
+              types: [{{
+                description: "CSV files",
+                accept: {{
+                  "text/csv": [".csv"]
+                }}
+              }}]
+            }});
+
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            status.textContent = "Saved successfully.";
+          }} else {{
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = outputName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            status.textContent = "Browser save picker not supported here, so a normal download was used.";
+          }}
+        }} catch (err) {{
+          if (err && err.name === "AbortError") {{
+            status.textContent = "Save cancelled.";
+          }} else {{
+            status.textContent = "Could not open save picker. A normal download may be needed in this browser.";
+          }}
+        }}
+      }}
+
+      document.getElementById("saveBtn").addEventListener("click", saveCsv);
+    </script>
+    """
+    components.html(html, height=90)
+
+
 if "csv_bytes" not in st.session_state:
     st.session_state.csv_bytes = None
 
@@ -385,7 +472,7 @@ st.markdown("""
 st.markdown("""
 <div class="hero-title">Convert PDF to CSV</div>
 <div class="hero-subtitle">
-    Upload a PDF, extract invoice data, and download the CSV file.
+    Upload a PDF, extract invoice data, and choose where to save the CSV file.
 </div>
 """, unsafe_allow_html=True)
 
@@ -430,9 +517,7 @@ with center:
                 st.error(f"Conversion failed: {str(e)}")
 
     if st.session_state.csv_bytes is not None:
-        st.download_button(
-            label="Download CSV",
-            data=st.session_state.csv_bytes,
-            file_name=st.session_state.output_name,
-            mime="text/csv"
+        render_save_picker(
+            st.session_state.csv_bytes,
+            st.session_state.output_name
         )
